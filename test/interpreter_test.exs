@@ -1,10 +1,11 @@
 defmodule NtrprtTest do
   use ExUnit.Case
 
-  test "works" do
+  test "interprets asts" do
+    assert interpret("1+2") == 3
+    assert interpret("2-1") == 1
     assert interpret("2+3+10*2") == 25
     assert interpret("2") == 2
-    assert interpret("2+1") == 3
     assert interpret("1+3/3") == 2
     assert interpret("2*2*2") == 8
     assert interpret("2*(2+2)") == 8
@@ -15,6 +16,7 @@ defmodule NtrprtTest do
   defp interpret(str) do
     str
     |> Ntrprt.Lexer.lex()
+    |> Ntrprt.Parser.parse()
     |> Ntrprt.Interpreter.interpret()
   end
 end

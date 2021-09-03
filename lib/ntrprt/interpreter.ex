@@ -1,59 +1,15 @@
 defmodule Ntrprt.Interpreter do
-  def interpret(tokens) do
-    tokens
-    |> root()
-    |> List.first()
-  end
-
-  # root() -> term() + | - term()*
-  def root(tokens) do
-    [left | tokens] = term(tokens)
-
-    case tokens do
-      [{:token, :+} | tokens] ->
-        [right | tokens] = term(tokens)
-        root([left + right | tokens])
-
-      [{:token, :-} | tokens] ->
-        [right | tokens] = term(tokens)
-        root([left - right | tokens])
-
-      _ ->
-        [left | tokens]
+  def interpret([operator, left_ast, right_ast]) when operator in [:+, :-, :*, :/] do
+    with left <- interpret(left_ast),
+         right <- interpret(right_ast) do
+      run_binary(operator, left, right)
     end
   end
 
-  # term() -> el() * | / el()*
-  def term(tokens) do
-    [left | tokens] = el(tokens)
+  def interpret([:number, value]), do: value
 
-    case tokens do
-      [{:token, :*} | tokens] ->
-        [right | tokens] = el(tokens)
-        term([left * right | tokens])
-
-      [{:token, :/} | tokens] ->
-        [right | tokens] = el(tokens)
-        term([left / right | tokens])
-
-      _ ->
-        [left | tokens]
-    end
-  end
-
-  # el() -> number | ( root )
-  def el(tokens) do
-    case tokens do
-      [{:token, :number, value} | tokens] ->
-        [value | tokens]
-
-      [{:token, :lparen} | tokens] ->
-        [right | tokens] = root(tokens)
-        [{:token, :rparen} | tokens] = tokens
-        [right | tokens]
-
-      [value | tokens] ->
-        [value | tokens]
-    end
-  end
+  defp run_binary(:+, left, right), do: left + right
+  defp run_binary(:-, left, right), do: left - right
+  defp run_binary(:*, left, right), do: left * right
+  defp run_binary(:/, left, right), do: left / right
 end

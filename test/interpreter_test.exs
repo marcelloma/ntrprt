@@ -11,6 +11,11 @@ defmodule NtrprtTest do
     assert interpret("2*(2+2)") == 8
     assert interpret("((10+20))") == 30
     assert interpret("((10+20)*2)") == 60
+    assert interpret("2*-1") == -2
+    assert interpret("2*--1") == 2
+    assert interpret("2*---1") == -2
+    assert interpret("2*-(-(+2-1))") == 2
+    assert interpret("5 - - - + - (3 + 4) - +2") == 10
   end
 
   defp interpret(str) do

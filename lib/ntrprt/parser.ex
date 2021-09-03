@@ -41,9 +41,17 @@ defmodule Ntrprt.Parser do
     end
   end
 
-  # el() -> number | ( root )
+  # el() -> + | - number | ( root )
   def el(tokens) do
     case tokens do
+      [{:token, :+} | tokens] ->
+        [left| tokens] = el(tokens)
+        [[:+, left] | tokens]
+
+      [{:token, :-} | tokens] ->
+        [left| tokens] = el(tokens)
+        [[:-, left] | tokens]
+
       [{:token, :number, value} | tokens] ->
         [[:number, value] | tokens]
 

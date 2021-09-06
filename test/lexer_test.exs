@@ -23,6 +23,23 @@ defmodule LexerTest do
              {:token, :+},
              {:token, :number, 2}
            ]
+
+    assert lex("a-b; fn ->(a, b) { a }") == [
+             {:token, :identifier, "a"},
+             {:token, :-},
+             {:token, :identifier, "b"},
+             {:token, :semi},
+             {:token, :fn},
+             {:token, :->},
+             {:token, :lparen},
+             {:token, :identifier, "a"},
+             {:token, :comma},
+             {:token, :identifier, "b"},
+             {:token, :rparen},
+             {:token, :lbrace},
+             {:token, :identifier, "a"},
+             {:token, :rbrace}
+           ]
   end
 
   defp lex(str) do

@@ -5,7 +5,7 @@ defmodule Ntrprt.Parser do
     |> List.first()
   end
 
-  # compound_statement : statement | statement ('semi' | 'newline') compound_statement
+  def compound_statement([{:token, :newline} | tokens]), do: compound_statement(tokens, [])
   def compound_statement(tokens), do: compound_statement(tokens, [])
 
   def compound_statement(tokens, statements) do
@@ -20,42 +20,91 @@ defmodule Ntrprt.Parser do
       [{:token, :newline} | tokens] ->
         compound_statement(tokens, statements)
 
-      [] ->
-        [[:compound_statement, statements |> Enum.reverse()]]
-
       _ ->
-        raise "statement must end with semicolon or newline"
+        [statements |> Enum.reverse() | tokens]
     end
   end
 
-  # statement : assignment_statement | expression
   def statement(tokens) do
     case tokens do
-      [{:token, :identifier, _} | _] ->
-        [value | tokens] = assignment_statement(tokens)
-        [[:statement, value] | tokens]
+      [{:token, :identifier, _}, {:token, :=} | _] ->
+        assignment_statement(tokens)
+
+      [{:token, :identifier, _}, {:token, :lparen} | _] ->
+        function_call(tokens)
 
       _ ->
-        [value | tokens] = expression(tokens)
-        [[:statement, value] | tokens]
+        expression(tokens)
     end
   end
 
-  # assignment_statement : variable '=' expression
   def assignment_statement(tokens) do
     [left | tokens] = variable(tokens)
+    [{:token, :=} | tokens] = tokens
+    [right | tokens] = expression(tokens)
+    [[:assignment_statement, left, right] | tokens]
+  end
+
+  def function_call(tokens) do
+    [{:token, :identifier, identifier} | tokens] = tokens
+    [{:token, :lparen} | tokens] = tokens
+    [params | tokens] = function_call_arguments(tokens)
+    [{:token, :rparen} | tokens] = tokens
 
     case tokens do
-      [{:token, :=} | tokens] ->
-        [right | tokens] = expression(tokens)
-        [[:assignment_statement, left, right] | tokens]
+      [{:token, :newline} | tokens] ->
+        [[:call, identifier, params] | tokens]
 
       _ ->
-        tokens
+        [[:call, identifier, params] | tokens]
     end
   end
 
-  # expression : term | (('+' | '-') term)*
+  def function_call_arguments(tokens, arguments \\ [])
+  def function_call_arguments([{:token, :rparen} | tokens], arguments), do: [arguments | tokens]
+
+  def function_call_arguments(tokens, arguments) do
+    [argument | tokens] = statement(tokens)
+
+    case tokens do
+      [{:token, :comma} | tokens] ->
+        function_call_arguments(tokens, [argument | arguments])
+
+      _ ->
+        [[argument | arguments] | tokens]
+    end
+  end
+
+  def function(tokens) do
+    [{:token, :lparen} | tokens] = tokens
+    [params | tokens] = function_parameters(tokens)
+    [{:token, :rparen} | tokens] = tokens
+
+    case tokens do
+      [{:token, :lbrace} | tokens] ->
+        [body | tokens] = compound_statement(tokens)
+        [{:token, :rbrace} | tokens] = tokens
+        [[:function, params, body] | tokens]
+
+      _ ->
+        [body | tokens] = statement(tokens)
+        [[:function, params, [body]] | tokens]
+    end
+  end
+
+  def function_parameters(tokens, parameters \\ []) do
+    case tokens do
+      [{:token, :comma} | tokens] ->
+        function_parameters(tokens, parameters)
+
+      [{:token, :identifier, identifier} | tokens] ->
+        [[identifier | parameters] | tokens]
+
+      _ ->
+        [[] | tokens]
+    end
+  end
+
   def expression(tokens) do
     [left | tokens] = term(tokens)
 
@@ -67,6 +116,10 @@ defmodule Ntrprt.Parser do
       [{:token, :-} | tokens] ->
         [right | tokens] = term(tokens)
         expression([[:-, left, right] | tokens])
+
+      [{:token, :->} | tokens] ->
+        [value | tokens] = function(tokens)
+        [value | tokens]
 
       _ ->
         [left | tokens]
@@ -91,11 +144,6 @@ defmodule Ntrprt.Parser do
     end
   end
 
-  # factor : '+' factor
-  #        | '-' factor
-  #        | 'number'
-  #        | 'lparen' expression 'rparen'
-  #        | variable
   def factor(tokens) do
     case tokens do
       [{:token, :+} | tokens] ->
@@ -119,7 +167,6 @@ defmodule Ntrprt.Parser do
     end
   end
 
-  # variable : 'identifier'
   def variable(tokens) do
     case tokens do
       [{:token, :identifier, identifier} | tokens] ->

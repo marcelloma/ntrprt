@@ -9,7 +9,7 @@ defmodule Ntrprt.Lexer do
     do: tokens |> Enum.reverse() |> Enum.filter(&(elem(&1, 0) != :skip_token))
 
   def lex(state) do
-    [&number_rule/1, &operator_rule/1, &space_rule/1, &identifier_rule/1]
+    [&number_rule/1, &operator_rule/1, &space_rule/1, &identifier_rule/1, &fail_rule/1]
     |> Enum.reduce(state, &apply_rule(&2, &1))
     |> push_token()
     |> lex()
@@ -36,7 +36,7 @@ defmodule Ntrprt.Lexer do
     end
   end
 
-  def identifier_rule(state, acc \\ <<>>) do
+  def identifier_rule(state, prev_chars \\ <<>>) do
     {char, new_state} = next_char(state)
 
     char = if char, do: char, else: <<>>
@@ -46,32 +46,50 @@ defmodule Ntrprt.Lexer do
 
     cond do
       is_letter && char == <<>> ->
-        identifier_rule(new_state, acc <> <<char>>)
+        identifier_rule(new_state, prev_chars <> <<char>>)
 
       is_letter || is_number ->
-        identifier_rule(new_state, acc <> <<char>>)
+        identifier_rule(new_state, prev_chars <> <<char>>)
 
-      !is_letter && !is_number && acc != <<>> ->
-        %{state | token: {:token, :identifier, acc}}
+      !is_letter && !is_number && prev_chars != <<>> ->
+        %{state | token: check_for_keyword(prev_chars)}
 
       !is_letter && char == <<>> ->
+        state
+
+      true ->
         state
     end
   end
 
-  def operator_rule(state) do
+  def check_for_keyword(identifier) do
+    if identifier == "fn" do
+      {:token, :fn}
+    else
+      {:token, :identifier, identifier}
+    end
+  end
+
+  def operator_rule(state, prev_chars \\ <<>>) do
     {char, new_state} = next_char(state)
 
+    chars = prev_chars <> <<char::utf8>>
+
     cond do
-      char == ?+ -> %{new_state | token: {:token, :+}}
-      char == ?- -> %{new_state | token: {:token, :-}}
-      char == ?/ -> %{new_state | token: {:token, :/}}
-      char == ?* -> %{new_state | token: {:token, :*}}
-      char == ?= -> %{new_state | token: {:token, :=}}
-      char == ?( -> %{new_state | token: {:token, :lparen}}
-      char == ?) -> %{new_state | token: {:token, :rparen}}
-      char == ?\n -> %{new_state | token: {:token, :newline}}
-      char == ?; -> %{new_state | token: {:token, :semi}}
+      chars == "->" -> %{new_state | token: {:token, :->}}
+      chars == "+" -> %{new_state | token: {:token, :+}}
+      chars == "-" -> operator_rule(new_state, chars) || %{new_state | token: {:token, :-}}
+      chars == "/" -> %{new_state | token: {:token, :/}}
+      chars == "*" -> %{new_state | token: {:token, :*}}
+      chars == "=" -> %{new_state | token: {:token, :=}}
+      chars == "(" -> %{new_state | token: {:token, :lparen}}
+      chars == ")" -> %{new_state | token: {:token, :rparen}}
+      chars == "{" -> %{new_state | token: {:token, :lbrace}}
+      chars == "}" -> %{new_state | token: {:token, :rbrace}}
+      chars == "\n" -> %{new_state | token: {:token, :newline}}
+      chars == ";" -> %{new_state | token: {:token, :semi}}
+      chars == "," -> %{new_state | token: {:token, :comma}}
+      prev_chars != <<>> -> nil
       true -> state
     end
   end
@@ -84,6 +102,11 @@ defmodule Ntrprt.Lexer do
     else
       state
     end
+  end
+
+  def fail_rule(state) do
+    {char, _} = next_char(state)
+    raise "could not lex #{<<char::utf8>>}"
   end
 
   def next_char(state) do

@@ -3,23 +3,34 @@ defmodule Ntrprt.Interpreter do
     interpret(asts, %{})
   end
 
-  def interpret([:compound_statement, [statement_ast]], scope) do
-    with {value, scope} <- interpret(statement_ast, scope) do
-      {value, scope}
-    end
+  def interpret(
+        [:assignment_statement, [:variable, identifier], [:function | _] = function_ast],
+        scope
+      ) do
+    scope = Map.put(scope, identifier, function_ast)
+    {identifier, scope}
   end
 
-  def interpret([:compound_statement, [statement_ast | statement_asts]], scope) do
-    with {_, scope} <- interpret(statement_ast, scope) do
-      interpret([:compound_statement, statement_asts], scope)
-    end
-  end
-
-  def interpret([:statement, value_ast], scope) do
+  def interpret([:assignment_statement, [:variable, identifier], value_ast], scope) do
     with {value, scope} <- interpret(value_ast, scope) do
+      scope = Map.put(scope, identifier, value)
       {value, scope}
     end
   end
+
+  def interpret([:call, identifier, argument_asts], scope) do
+    with [:function, formal_arguments, body_ast] <- Map.get(scope, identifier),
+         argument_values <-
+           argument_asts |> Enum.map(&interpret(&1, scope)) |> Enum.map(&elem(&1, 0)),
+         arguments <- Enum.zip(formal_arguments, argument_values) |> Enum.into(%{}),
+         nested_scope <- Map.merge(scope, arguments),
+         {value, _} <- interpret(body_ast, nested_scope) do
+      {value, scope}
+    end
+  end
+
+  def interpret([:number, value], scope), do: {value, scope}
+  def interpret([:variable, value], scope), do: {Map.get(scope, value), scope}
 
   def interpret([operator, value_ast], scope) when operator in [:+, :-] do
     with {value, scope} <- interpret(value_ast, scope) do
@@ -34,15 +45,17 @@ defmodule Ntrprt.Interpreter do
     end
   end
 
-  def interpret([:assignment_statement, [:variable, identifier], value_ast], scope) do
-    with {value, scope} <- interpret(value_ast, scope) do
-      scope = Map.put(scope, identifier, value)
+  def interpret([statement_ast], scope) do
+    with {value, scope} <- interpret(statement_ast, scope) do
       {value, scope}
     end
   end
 
-  def interpret([:number, value], scope), do: {value, scope}
-  def interpret([:variable, value], scope), do: {Map.get(scope, value), scope}
+  def interpret([statement_ast | statement_asts], scope) do
+    with {_, scope} <- interpret(statement_ast, scope) do
+      interpret([statement_asts], scope)
+    end
+  end
 
   defp run_unary(:+, value), do: +value
   defp run_unary(:-, value), do: -value

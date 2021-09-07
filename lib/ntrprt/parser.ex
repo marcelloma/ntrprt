@@ -55,6 +55,9 @@ defmodule Ntrprt.Parser do
       [{:token, :newline} | tokens] ->
         [[:call, identifier, params] | tokens]
 
+      [{:token, :lparen} | _] ->
+        [[:call, identifier, params] | tokens]
+
       _ ->
         [[:call, identifier, params] | tokens]
     end

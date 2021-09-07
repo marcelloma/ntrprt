@@ -1,130 +1,93 @@
 defmodule Ntrprt.Lexer do
-  defstruct [:code, :token, tokens: []]
+  @symbols [?+, ?-, ?*, ?/, ?=, ?;, ?,, ?!, ?(, ?), ?{, ?}, ?\n, ?;]
+  @complex_symbols [[?-, ?>], [?=, ?=], [?!, ?=], [?<, ?=], [?>, ?=]]
 
-  def lex(code) when is_binary(code) do
-    lex(%__MODULE__{code: code})
+  @whitespace [?\r, ?\v, ?\t, ?\s]
+  @alpha ?A..?z
+  @digits ?0..?9
+  @keywords ["fn", "if", "else"]
+
+  @type meta() :: %{line: integer(), column: integer()}
+  @type token() :: {:atom, meta()} | {:atom, any(), meta()}
+
+  @spec lex(String.t()) :: [token()]
+  def lex(string) do
+    lex(String.to_charlist(string), 0, 0)
   end
 
-  def lex(%{code: <<>>, tokens: tokens, token: nil}),
-    do: tokens |> Enum.reverse() |> Enum.filter(&(elem(&1, 0) != :skip_token))
+  defp lex([], _line, _column), do: []
 
-  def lex(state) do
-    [&number_rule/1, &operator_rule/1, &space_rule/1, &identifier_rule/1, &fail_rule/1]
-    |> Enum.reduce(state, &apply_rule(&2, &1))
-    |> push_token()
-    |> lex()
-  end
+  @spec lex(charlist(), integer(), integer()) :: [token()]
+  defp lex(unprocessed, line, column) do
+    {type, value, length} = read_token(unprocessed)
 
-  def apply_rule(state, _rule) when not is_nil(state.token), do: state
-  def apply_rule(state, rule), do: rule.(state)
+    token =
+      if value do
+        {type, value, %{line: line, column: column}}
+      else
+        {type, %{line: line, column: column}}
+      end
 
-  def number_rule(state, acc \\ nil) do
-    {char, new_state} = next_char(state)
+    line = if type == :"\n", do: line + 1, else: line
+    column = if type == :"\n", do: 0, else: column + length
+    unprocessed = Enum.drop(unprocessed, length)
 
-    parse_result = Integer.parse(if char, do: <<char::utf8>>, else: <<>>)
-
-    cond do
-      parse_result == :error && is_nil(acc) ->
-        state
-
-      parse_result == :error ->
-        %{state | token: {:token, :number, acc}}
-
-      true ->
-        {number, _} = parse_result
-        number_rule(new_state, (acc || 0) * 10 + number)
-    end
-  end
-
-  def identifier_rule(state, prev_chars \\ <<>>) do
-    {char, new_state} = next_char(state)
-
-    char = if char, do: char, else: <<>>
-
-    is_letter = is_letter?(char)
-    is_number = is_number?(char)
-
-    cond do
-      is_letter && char == <<>> ->
-        identifier_rule(new_state, prev_chars <> <<char>>)
-
-      is_letter || is_number ->
-        identifier_rule(new_state, prev_chars <> <<char>>)
-
-      !is_letter && !is_number && prev_chars != <<>> ->
-        %{state | token: check_for_keyword(prev_chars)}
-
-      !is_letter && char == <<>> ->
-        state
-
-      true ->
-        state
-    end
-  end
-
-  def check_for_keyword(identifier) do
-    if identifier == "fn" do
-      {:token, :fn}
+    if type == :" " do
+      lex(unprocessed, line, column)
     else
-      {:token, :identifier, identifier}
+      [token | lex(unprocessed, line, column)]
     end
   end
 
-  def operator_rule(state, prev_chars \\ <<>>) do
-    {char, new_state} = next_char(state)
-
-    chars = prev_chars <> <<char::utf8>>
-
-    cond do
-      chars == "->" -> %{new_state | token: {:token, :->}}
-      chars == "+" -> %{new_state | token: {:token, :+}}
-      chars == "-" -> operator_rule(new_state, chars) || %{new_state | token: {:token, :-}}
-      chars == "/" -> %{new_state | token: {:token, :/}}
-      chars == "*" -> %{new_state | token: {:token, :*}}
-      chars == "=" -> %{new_state | token: {:token, :=}}
-      chars == "(" -> %{new_state | token: {:token, :lparen}}
-      chars == ")" -> %{new_state | token: {:token, :rparen}}
-      chars == "{" -> %{new_state | token: {:token, :lbrace}}
-      chars == "}" -> %{new_state | token: {:token, :rbrace}}
-      chars == "\n" -> %{new_state | token: {:token, :newline}}
-      chars == ";" -> %{new_state | token: {:token, :semi}}
-      chars == "," -> %{new_state | token: {:token, :comma}}
-      prev_chars != <<>> -> nil
-      true -> state
-    end
+  @spec read_token(charlist()) :: {atom(), any(), integer()}
+  defp read_token([char | _]) when char in @whitespace do
+    {:" ", nil, 1}
   end
 
-  def space_rule(state) do
-    {char, new_state} = next_char(state)
+  defp read_token([char1, char2 | _]) when [char1, char2] in @complex_symbols do
+    symbol =
+      [<<char1::utf8>>, <<char2::utf8>>]
+      |> List.to_string()
+      |> String.to_atom()
 
-    if char == ?\s do
-      %{new_state | token: {:skip_token}}
+    {symbol, nil, 2}
+  end
+
+  defp read_token([char | _]) when char in @symbols do
+    {String.to_atom(<<char::utf8>>), nil, 1}
+  end
+
+  defp read_token([char | _] = unprocessed) when char in @digits do
+    value =
+      unprocessed
+      |> read_while(&(&1 in @digits || &1 in @alpha))
+      |> List.to_string()
+
+    token_length = String.length(value)
+    {value, _} = Float.parse(value)
+
+    {:number, value, token_length}
+  end
+
+  defp read_token([char | _] = unprocessed) when char in @alpha do
+    value =
+      unprocessed
+      |> read_while(&(&1 in @digits || &1 in @alpha))
+      |> List.to_string()
+
+    token_length = String.length(value)
+
+    if value in @keywords do
+      {String.to_atom(value), nil, token_length}
     else
-      state
+      {:identifier, value, token_length}
     end
   end
 
-  def fail_rule(state) do
-    {char, _} = next_char(state)
-    raise "could not lex #{<<char::utf8>>}"
+  @spec read_while(charlist(), (char() -> boolean())) :: charlist()
+  defp read_while([], _fun), do: []
+
+  defp read_while([char | rest], fun) do
+    if fun.(char), do: [char | read_while(rest, fun)], else: []
   end
-
-  def next_char(state) do
-    case state.code do
-      <<char::utf8, code::binary>> -> {char, %{state | code: code}}
-      <<>> -> {nil, state}
-    end
-  end
-
-  def push_token(state) do
-    state
-    |> Map.put(:token, nil)
-    |> Map.update!(:tokens, &[state.token | &1])
-  end
-
-  defp is_letter?(char) when char in ?a..?z, do: true
-  defp is_letter?(_char), do: false
-
-  defp is_number?(char) when char in ?0..?9, do: true
-  defp is_number?(_char), do: false
 end

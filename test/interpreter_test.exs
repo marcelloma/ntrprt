@@ -25,12 +25,19 @@ defmodule NtrprtTest do
     inc = fn ->(x) x + 1
     inc(inc(3))
     ")
+
+    assert {3, %{"inc" => [:function, ["x"], [[:+, [:variable, "x"], [:number, 1]]]]}} =
+             interpret("
+    addcurry = fn ->(x) fn ->(y) x + y
+    addcurry(1)(2)
+    ")
   end
 
   defp interpret(str) do
     str
     |> Ntrprt.Lexer.lex()
     |> Ntrprt.Parser.parse()
+    |> IO.inspect()
     |> Ntrprt.Interpreter.interpret()
   end
 end

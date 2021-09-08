@@ -66,7 +66,7 @@ defmodule Ntrprt.Lexer do
     token_length = String.length(value)
     {value, _} = Float.parse(value)
 
-    {:number, value, token_length}
+    {:num, value, token_length}
   end
 
   defp read_token([char | _] = unprocessed) when char in @alpha do
@@ -80,7 +80,7 @@ defmodule Ntrprt.Lexer do
     if value in @keywords do
       {String.to_atom(value), nil, token_length}
     else
-      {:identifier, value, token_length}
+      {:id, value, token_length}
     end
   end
 

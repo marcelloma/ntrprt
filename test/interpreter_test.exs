@@ -1,6 +1,7 @@
 defmodule NtrprtTest do
   use ExUnit.Case
 
+  @tag :skip
   test "interprets asts" do
     assert interpret("1+2") == {3, %{}}
     assert interpret("2-1") == {1, %{}}

@@ -1,182 +1,118 @@
 defmodule Ntrprt.Parser do
+  import Ntrprt.Combinator
+
   def parse(tokens) do
-    tokens
-    |> compound_statement()
-    |> List.first()
+    block().(tokens)
   end
 
-  def compound_statement([{:token, :newline} | tokens]), do: compound_statement(tokens, [])
-  def compound_statement(tokens), do: compound_statement(tokens, [])
-
-  def compound_statement(tokens, statements) do
-    [new_statement | tokens] = statement(tokens)
-
-    statements = [new_statement | statements]
-
-    case tokens do
-      [{:token, :semi} | tokens] ->
-        compound_statement(tokens, statements)
-
-      [{:token, :newline} | tokens] ->
-        compound_statement(tokens, statements)
-
-      _ ->
-        [statements |> Enum.reverse() | tokens]
+  def match(token) do
+    fn
+      [{^token, %{}} | rest] -> {:ok, token, rest}
+      _ -> {:error, ""}
     end
   end
 
-  def statement(tokens) do
-    case tokens do
-      [{:token, :identifier, _}, {:token, :=} | _] ->
-        assignment_statement(tokens)
-
-      [{:token, :identifier, _}, {:token, :lparen} | _] ->
-        function_call(tokens)
-
-      _ ->
-        expression(tokens)
+  def skip(token) do
+    fn
+      [{^token, %{}} | rest] -> {:ok, nil, rest}
+      _ -> {:error, ""}
     end
   end
 
-  def assignment_statement(tokens) do
-    [left | tokens] = variable(tokens)
-    [{:token, :=} | tokens] = tokens
-    [right | tokens] = expression(tokens)
-    [[:assignment_statement, left, right] | tokens]
-  end
-
-  def function_call(tokens) do
-    [{:token, :identifier, identifier} | tokens] = tokens
-    [{:token, :lparen} | tokens] = tokens
-    [params | tokens] = function_call_arguments(tokens)
-    [{:token, :rparen} | tokens] = tokens
-
-    case tokens do
-      [{:token, :newline} | tokens] ->
-        [[:call, identifier, params] | tokens]
-
-      [{:token, :lparen} | _] ->
-        [[:call, identifier, params] | tokens]
-
-      _ ->
-        [[:call, identifier, params] | tokens]
+  def value(token) do
+    fn
+      [{^token, value, %{}} | rest] -> {:ok, [token, value], rest}
+      _ -> {:error, ""}
     end
   end
 
-  def function_call_arguments(tokens, arguments \\ [])
-  def function_call_arguments([{:token, :rparen} | tokens], arguments), do: [arguments | tokens]
-
-  def function_call_arguments(tokens, arguments) do
-    [argument | tokens] = statement(tokens)
-
-    case tokens do
-      [{:token, :comma} | tokens] ->
-        function_call_arguments(tokens, [argument | arguments])
-
-      _ ->
-        [[argument | arguments] | tokens]
-    end
+  def unary_operation(operator, term) do
+    sequence([operator, term])
+    |> map(fn [left, right] -> [left, [right]] end)
   end
 
-  def function(tokens) do
-    [{:token, :lparen} | tokens] = tokens
-    [params | tokens] = function_parameters(tokens)
-    [{:token, :rparen} | tokens] = tokens
-
-    case tokens do
-      [{:token, :lbrace} | tokens] ->
-        [body | tokens] = compound_statement(tokens)
-        [{:token, :rbrace} | tokens] = tokens
-        [[:function, params, body] | tokens]
-
-      _ ->
-        [body | tokens] = statement(tokens)
-        [[:function, params, [body]] | tokens]
-    end
+  def binary_operation(operator, term) do
+    sequence([
+      term,
+      one_or_many(sequence([operator, term]))
+    ])
+    |> map(fn [left, [[middle, right]]] -> [middle, [left, right]] end)
   end
 
-  def function_parameters(tokens, parameters \\ []) do
-    case tokens do
-      [{:token, :comma} | tokens] ->
-        function_parameters(tokens, parameters)
-
-      [{:token, :identifier, identifier} | tokens] ->
-        [[identifier | parameters] | tokens]
-
-      _ ->
-        [[] | tokens]
-    end
+  def multiplication_or_division() do
+    choice([match(:*), match(:/)])
+    |> binary_operation(factor())
   end
 
-  def expression(tokens) do
-    [left | tokens] = term(tokens)
-
-    case tokens do
-      [{:token, :+} | tokens] ->
-        [right | tokens] = term(tokens)
-        expression([[:+, left, right] | tokens])
-
-      [{:token, :-} | tokens] ->
-        [right | tokens] = term(tokens)
-        expression([[:-, left, right] | tokens])
-
-      [{:token, :->} | tokens] ->
-        [value | tokens] = function(tokens)
-        [value | tokens]
-
-      _ ->
-        [left | tokens]
-    end
+  def plus_or_minus() do
+    choice([match(:+), match(:-)])
+    |> binary_operation(term())
   end
 
-  # term : factor | (('*' | '/') factor)*
-  def term(tokens) do
-    [left | tokens] = factor(tokens)
-
-    case tokens do
-      [{:token, :*} | tokens] ->
-        [right | tokens] = factor(tokens)
-        term([[:*, left, right] | tokens])
-
-      [{:token, :/} | tokens] ->
-        [right | tokens] = factor(tokens)
-        term([[:/, left, right] | tokens])
-
-      _ ->
-        [left | tokens]
-    end
+  def unary() do
+    choice([match(:+), match(:-)])
+    |> unary_operation(number())
   end
 
-  def factor(tokens) do
-    case tokens do
-      [{:token, :+} | tokens] ->
-        [left | tokens] = factor(tokens)
-        [[:+, left] | tokens]
-
-      [{:token, :-} | tokens] ->
-        [left | tokens] = factor(tokens)
-        [[:-, left] | tokens]
-
-      [{:token, :number, value} | tokens] ->
-        [[:number, value] | tokens]
-
-      [{:token, :lparen} | tokens] ->
-        [right | tokens] = expression(tokens)
-        [{:token, :rparen} | tokens] = tokens
-        [right | tokens]
-
-      _ ->
-        variable(tokens)
-    end
+  def expression() do
+    choice([plus_or_minus(), term()])
   end
 
-  def variable(tokens) do
-    case tokens do
-      [{:token, :identifier, identifier} | tokens] ->
-        [[:variable, identifier] | tokens]
+  def term() do
+    choice([multiplication_or_division(), factor()])
+  end
 
-      _ ->
-        tokens
-    end
+  def factor() do
+    choice([
+      unary(),
+      sequence([match(:"("), &expression().(&1), match(:")")]),
+      number(),
+      identifier()
+    ])
+  end
+
+  def number() do
+    value(:num)
+  end
+
+  def identifier() do
+    value(:id)
+  end
+
+  def block() do
+    sequence([
+      zero_or_many(match(:"\n")),
+      statement_list(),
+      zero_or_many(match(:"\n"))
+    ])
+    |> map(&Enum.at(&1, 1))
+  end
+
+  def statement_list() do
+    choice([
+      one_or_many(
+        sequence([
+          statement(),
+          choice([match(:";"), match(:"\n")]),
+          statement()
+        ])
+        |> map(&List.delete_at(&1, 1))
+      )
+      |> map(&List.first/1),
+      statement()
+    ])
+  end
+
+  def statement() do
+    choice([assignment(), expression()])
+  end
+
+  def assignment() do
+    sequence([
+      identifier(),
+      match(:=),
+      expression()
+    ])
+    |> map(fn [left, operator, right] -> [operator, [left, right]] end)
   end
 end

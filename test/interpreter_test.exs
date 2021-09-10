@@ -1,7 +1,6 @@
 defmodule NtrprtTest do
   use ExUnit.Case
 
-  @tag :skip
   test "interprets asts" do
     assert interpret("1+2") == {3, %{}}
     assert interpret("2-1") == {1, %{}}
@@ -21,24 +20,24 @@ defmodule NtrprtTest do
     assert interpret("a=1+2; b=a+4") == {7, %{"a" => 3, "b" => 7}}
     assert interpret("a=1+2\n b=a+4") == {7, %{"a" => 3, "b" => 7}}
 
-    assert {5, %{"inc" => [:function, ["x"], [[:+, [:variable, "x"], [:number, 1]]]]}} =
-             interpret("
-    inc = fn ->(x) x + 1
-    inc(inc(3))
-    ")
+    # assert {5, %{"inc" => [:function, ["x"], [[:+, [:variable, "x"], [:number, 1]]]]}} =
+    #          interpret("
+    # inc = fn ->(x) x + 1
+    # inc(inc(3))
+    # ")
 
-    assert {3, %{"inc" => [:function, ["x"], [[:+, [:variable, "x"], [:number, 1]]]]}} =
-             interpret("
-    addcurry = fn ->(x) fn ->(y) x + y
-    addcurry(1)(2)
-    ")
+    # assert {3, %{"inc" => [:function, ["x"], [[:+, [:variable, "x"], [:number, 1]]]]}} =
+    #          interpret("
+    # addcurry = fn ->(x) fn ->(y) x + y
+    # addcurry(1)(2)
+    # ")
   end
 
   defp interpret(str) do
     str
     |> Ntrprt.Lexer.lex()
     |> Ntrprt.Parser.parse()
-    |> IO.inspect()
+    |> elem(1)
     |> Ntrprt.Interpreter.interpret()
   end
 end

@@ -36,7 +36,14 @@ defmodule Ntrprt.Parser do
       term,
       one_or_many(sequence([operator, term]))
     ])
-    |> map(fn [left, [[middle, right]]] -> [middle, [left, right]] end)
+    |> map(fn [left, right] -> [left | right] end)
+    |> map(fn [left | right] ->
+      Enum.reduce(right, left, fn [op, right_argument], left -> [op, [left, right_argument]] end)
+    end)
+  end
+
+  def debug(parser, label) do
+    map(parser, &IO.inspect(&1, label: label))
   end
 
   def multiplication_or_division() do
@@ -51,7 +58,7 @@ defmodule Ntrprt.Parser do
 
   def unary() do
     choice([match(:+), match(:-)])
-    |> unary_operation(number())
+    |> unary_operation(&factor().(&1))
   end
 
   def expression() do
@@ -65,7 +72,7 @@ defmodule Ntrprt.Parser do
   def factor() do
     choice([
       unary(),
-      sequence([match(:"("), &expression().(&1), match(:")")]),
+      sequence([match(:"("), &expression().(&1), match(:")")]) |> map(&Enum.at(&1, 1)),
       number(),
       identifier()
     ])

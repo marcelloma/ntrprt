@@ -4,14 +4,14 @@ defmodule Ntrprt.Interpreter do
   end
 
   def interpret(
-        [:assignment_statement, [:variable, identifier], [:function | _] = function_ast],
+        [:=, [:id, identifier], [:function | _] = function_ast],
         scope
       ) do
     scope = Map.put(scope, identifier, function_ast)
     {identifier, scope}
   end
 
-  def interpret([:assignment_statement, [:variable, identifier], value_ast], scope) do
+  def interpret([:=, [[:id, identifier], value_ast]], scope) do
     with {value, scope} <- interpret(value_ast, scope) do
       scope = Map.put(scope, identifier, value)
       {value, scope}
@@ -29,16 +29,16 @@ defmodule Ntrprt.Interpreter do
     end
   end
 
-  def interpret([:number, value], scope), do: {value, scope}
-  def interpret([:variable, value], scope), do: {Map.get(scope, value), scope}
+  def interpret([:num, value], scope), do: {value, scope}
+  def interpret([:id, value], scope), do: {Map.get(scope, value), scope}
 
-  def interpret([operator, value_ast], scope) when operator in [:+, :-] do
+  def interpret([operator, [value_ast]], scope) when operator in [:+, :-] do
     with {value, scope} <- interpret(value_ast, scope) do
       {run_unary(operator, value), scope}
     end
   end
 
-  def interpret([operator, left_ast, right_ast], scope) when operator in [:+, :-, :*, :/] do
+  def interpret([operator, [left_ast, right_ast]], scope) when operator in [:+, :-, :*, :/] do
     with {left, scope} <- interpret(left_ast, scope),
          {right, scope} <- interpret(right_ast, scope) do
       {run_binary(operator, left, right), scope}

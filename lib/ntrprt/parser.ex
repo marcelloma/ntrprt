@@ -5,88 +5,7 @@ defmodule Ntrprt.Parser do
     block().(tokens)
   end
 
-  def match(token) do
-    fn
-      [{^token, %{}} | rest] -> {:ok, token, rest}
-      _ -> {:error, ""}
-    end
-  end
-
-  def skip(token) do
-    fn
-      [{^token, %{}} | rest] -> {:ok, nil, rest}
-      _ -> {:error, ""}
-    end
-  end
-
-  def value(token) do
-    fn
-      [{^token, value, %{}} | rest] -> {:ok, [token, value], rest}
-      _ -> {:error, ""}
-    end
-  end
-
-  def unary_operation(operator, term) do
-    sequence([operator, term])
-    |> map(fn [left, right] -> [left, [right]] end)
-  end
-
-  def binary_operation(operator, term) do
-    sequence([
-      term,
-      one_or_many(sequence([operator, term]))
-    ])
-    |> map(fn [left, right] -> [left | right] end)
-    |> map(fn [left | right] ->
-      Enum.reduce(right, left, fn [op, right_argument], left -> [op, [left, right_argument]] end)
-    end)
-  end
-
-  def debug(parser, label) do
-    map(parser, &IO.inspect(&1, label: label))
-  end
-
-  def multiplication_or_division() do
-    choice([match(:*), match(:/)])
-    |> binary_operation(factor())
-  end
-
-  def plus_or_minus() do
-    choice([match(:+), match(:-)])
-    |> binary_operation(term())
-  end
-
-  def unary() do
-    choice([match(:+), match(:-)])
-    |> unary_operation(&factor().(&1))
-  end
-
-  def expression() do
-    choice([plus_or_minus(), term()])
-  end
-
-  def term() do
-    choice([multiplication_or_division(), factor()])
-  end
-
-  def factor() do
-    choice([
-      unary(),
-      sequence([match(:"("), &expression().(&1), match(:")")]) |> map(&Enum.at(&1, 1)),
-      number(),
-      identifier()
-    ])
-  end
-
-  def number() do
-    value(:num)
-  end
-
-  def identifier() do
-    value(:id)
-  end
-
-  def block() do
+  defp block() do
     sequence([
       zero_or_many(match(:"\n")),
       statement_list(),
@@ -95,7 +14,7 @@ defmodule Ntrprt.Parser do
     |> map(&Enum.at(&1, 1))
   end
 
-  def statement_list() do
+  defp statement_list() do
     choice([
       one_or_many(
         sequence([
@@ -110,11 +29,11 @@ defmodule Ntrprt.Parser do
     ])
   end
 
-  def statement() do
+  defp statement() do
     choice([assignment(), expression()])
   end
 
-  def assignment() do
+  defp assignment() do
     sequence([
       identifier(),
       match(:=),
@@ -122,4 +41,73 @@ defmodule Ntrprt.Parser do
     ])
     |> map(fn [left, operator, right] -> [operator, [left, right]] end)
   end
+
+  defp expression() do
+    choice([plus_or_minus(), term()])
+  end
+
+  defp plus_or_minus() do
+    choice([match(:+), match(:-)])
+    |> binary_operation(term())
+  end
+
+  defp term() do
+    choice([multiplication_or_division(), factor()])
+  end
+
+  defp multiplication_or_division() do
+    choice([match(:*), match(:/)])
+    |> binary_operation(factor())
+  end
+
+  defp factor() do
+    choice([
+      unary(),
+      sequence([match(:"("), &expression().(&1), match(:")")]) |> map(&Enum.at(&1, 1)),
+      number(),
+      identifier()
+    ])
+  end
+
+  defp unary() do
+    choice([match(:+), match(:-)])
+    |> unary_operation(&factor().(&1))
+  end
+
+  defp match(token) do
+    fn
+      [{^token, %{}} | rest] -> {:ok, token, rest}
+      _ -> {:error, ""}
+    end
+  end
+
+  defp value(token) do
+    fn
+      [{^token, value, %{}} | rest] -> {:ok, [token, value], rest}
+      _ -> {:error, ""}
+    end
+  end
+
+  defp unary_operation(operator, term) do
+    sequence([operator, term])
+    |> map(fn [left, right] -> [left, [right]] end)
+  end
+
+  defp binary_operation(operator, term) do
+    sequence([
+      term,
+      one_or_many(sequence([operator, term]))
+    ])
+    |> map(fn [left, right] -> [left | right] end)
+    |> map(fn [left | right] ->
+      Enum.reduce(right, left, fn [op, right_argument], left -> [op, [left, right_argument]] end)
+    end)
+  end
+
+  defp number(), do: value(:num)
+  defp identifier(), do: value(:id)
+
+  # defp debug(parser, label) do
+  #   map(parser, &IO.inspect(&1, label: label))
+  # end
 end

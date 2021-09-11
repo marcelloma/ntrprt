@@ -1,6 +1,5 @@
 defmodule ParserTest do
   use ExUnit.Case
-  import Ntrprt.Lexer
 
   test "parses tokens into ast" do
     assert [:num, 2.0] = parse("2")
@@ -27,7 +26,7 @@ defmodule ParserTest do
     #          [
     #            :=,
     #            [[:id, "inc"],
-    #            [:function, ["a"], [[:+, [:id, "a"], [:num, 1.0]]]]]
+    #            [:fn, [[[:id, "a"]], [[:+, [:id, "a"], [:num, 1.0]]]]]]
     #          ]
     #        ] = parse("inc = fn ->(a) a + 1")
 

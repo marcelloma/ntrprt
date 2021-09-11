@@ -65,4 +65,8 @@ defmodule Ntrprt.Combinator do
       end
     end
   end
+
+  def wrap(function) do
+    map(function, fn value -> [value] end)
+  end
 end

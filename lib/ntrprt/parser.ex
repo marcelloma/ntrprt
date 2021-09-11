@@ -25,7 +25,7 @@ defmodule Ntrprt.Parser do
         |> map(&List.delete_at(&1, 1))
       )
       |> map(&List.first/1),
-      statement()
+      wrap(statement())
     ])
   end
 
@@ -43,7 +43,59 @@ defmodule Ntrprt.Parser do
   end
 
   defp expression() do
-    choice([plus_or_minus(), term()])
+    choice([
+      function(),
+      function_call(),
+      plus_or_minus(),
+      term()
+    ])
+  end
+
+  defp function() do
+    sequence([
+      match(:fn),
+      match(:->),
+      formal_argument_list(),
+      choice([
+        sequence([match(:"{"), &block().(&1), match(:"}")]) |> map(&Enum.at(&1, 1)),
+        wrap(&expression().(&1))
+      ])
+    ])
+    |> map(fn [_, _, args, body] -> [:fn, [args, body]] end)
+  end
+
+  defp formal_argument_list() do
+    choice([
+      sequence([match(:"("), match(:")")]) |> map(fn _ -> [] end),
+      sequence([
+        match(:"("),
+        identifier(),
+        zero_or_many(sequence([match(:","), identifier()])),
+        match(:")")
+      ])
+      |> map(fn [_, left, right, _] -> [left | right] end)
+    ])
+  end
+
+  defp function_call() do
+    sequence([
+      identifier(),
+      argument_list()
+    ])
+    |> map(fn [name, args] -> [:call, [name, args]] end)
+  end
+
+  defp argument_list() do
+    choice([
+      sequence([match(:"("), match(:")")]) |> map(fn _ -> [] end),
+      sequence([
+        match(:"("),
+        &expression().(&1),
+        zero_or_many(sequence([match(:","), identifier()])),
+        match(:")")
+      ])
+      |> map(fn [_, left, right, _] -> [left | right] end)
+    ])
   end
 
   defp plus_or_minus() do

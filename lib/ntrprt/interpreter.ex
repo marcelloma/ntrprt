@@ -1,80 +1,84 @@
 defmodule Ntrprt.Interpreter do
+  alias Ntrprt.Env
+
   def interpret(asts) do
-    interpret(asts, %{})
+    interpret(asts, Env.new())
+  end
+
+  defp push_env_to_function(env, [:fn, [args, body]]) do
+    [:fn, [args, body, env]]
   end
 
   def interpret(
         [:=, [[:id, identifier], [:fn | _] = function_ast]],
-        scope
+        env
       ) do
-    scope = Map.put(scope, identifier, function_ast)
-    {identifier, scope}
+    function = push_env_to_function(env, function_ast)
+    env = Env.set_variable(env, identifier, function)
+    {identifier, env}
   end
 
-  def interpret([:fn | _] = function_ast, scope) do
-    {function_ast, scope}
+  def interpret([:fn | _] = function_ast, env) do
+    function = push_env_to_function(env, function_ast)
+    {function, env}
   end
 
-  def interpret([:=, [[:id, identifier], value_ast]], scope) do
-    with {value, scope} <- interpret(value_ast, scope) do
-      scope = Map.put(scope, identifier, value)
-      {value, scope}
+  def interpret([:=, [[:id, identifier], value_ast]], env) do
+    with {value, env} <- interpret(value_ast, env) do
+      env = Env.set_variable(env, identifier, value)
+      {value, env}
     end
   end
 
-  def interpret([:call, [[:id, identifier], argument_asts]], scope) do
-    interpret([:call, [[:id, identifier], argument_asts], false], scope)
-  end
-
-  def interpret([:call, [[:id, identifier], argument_asts], nested_call], scope) do
-    with [:fn, [formal_arguments, body_ast]] <- Map.get(scope, identifier),
+  def interpret([:call, [[:id, identifier], argument_asts]], env) do
+    with [:fn, [formal_arguments, body_ast, local_env]] <- Env.get_variable(env, identifier),
          formal_arguments <- Enum.map(formal_arguments, &Enum.at(&1, 1)),
          argument_values <-
-           argument_asts |> Enum.map(&interpret(&1, scope)) |> Enum.map(&elem(&1, 0)),
-         arguments <- Enum.zip(formal_arguments, argument_values) |> Enum.into(%{}),
-         nested_scope <- Map.merge(scope, arguments),
-         {value, _} <- interpret(body_ast, nested_scope) do
-      {value, (if nested_call, do: nested_scope, else: scope)}
+           argument_asts |> Enum.map(&interpret(&1, env)) |> Enum.map(&elem(&1, 0)),
+         arguments <- Enum.zip(formal_arguments, argument_values),
+         call_env <- Env.push_frame(local_env) |> Env.set_variables(arguments),
+         {value, _} <- interpret(body_ast, call_env) do
+      {value, env}
     end
   end
 
-  def interpret([:call, [[:call|_] = other_call, argument_asts]], scope) do
-    with {[:fn, [formal_arguments, body_ast]], scope} <- interpret(other_call ++ [true], scope),
+  def interpret([:call, [[:call | _] = other_call, argument_asts]], env) do
+    with {[:fn, [formal_arguments, body_ast, local_env]], env} <- interpret(other_call, env),
          formal_arguments <- Enum.map(formal_arguments, &Enum.at(&1, 1)),
          argument_values <-
-           argument_asts |> Enum.map(&interpret(&1, scope)) |> Enum.map(&elem(&1, 0)),
-         arguments <- Enum.zip(formal_arguments, argument_values) |> Enum.into(%{}),
-         nested_scope <- Map.merge(scope, arguments),
-         {value, _} <- interpret(body_ast, nested_scope) do
-      {value, scope}
+           argument_asts |> Enum.map(&interpret(&1, env)) |> Enum.map(&elem(&1, 0)),
+         arguments <- Enum.zip(formal_arguments, argument_values),
+         call_env <- Env.push_frame(local_env) |> Env.set_variables(arguments),
+         {value, _} <- interpret(body_ast, call_env) do
+      {value, env}
     end
   end
 
-  def interpret([:num, value], scope), do: {value, scope}
-  def interpret([:id, value], scope), do: {Map.get(scope, value), scope}
+  def interpret([:num, value], env), do: {value, env}
+  def interpret([:id, identifier], env), do: {Env.get_variable(env, identifier), env}
 
-  def interpret([operator, [value_ast]], scope) when operator in [:+, :-] do
-    with {value, scope} <- interpret(value_ast, scope) do
-      {run_unary(operator, value), scope}
+  def interpret([operator, [value_ast]], env) when operator in [:+, :-] do
+    with {value, env} <- interpret(value_ast, env) do
+      {run_unary(operator, value), env}
     end
   end
 
-  def interpret([operator, [left_ast, right_ast]], scope) when operator in [:+, :-, :*, :/] do
-    with {left, scope} <- interpret(left_ast, scope),
-         {right, scope} <- interpret(right_ast, scope) do
-      {run_binary(operator, left, right), scope}
+  def interpret([operator, [left_ast, right_ast]], env) when operator in [:+, :-, :*, :/] do
+    with {left, env} <- interpret(left_ast, env),
+         {right, env} <- interpret(right_ast, env) do
+      {run_binary(operator, left, right), env}
     end
   end
 
-  def interpret([statement_ast], scope) do
-    with {value, scope} <- interpret(statement_ast, scope) do
-      {value, scope}
+  def interpret([statement_ast], env) do
+    with {value, env} <- interpret(statement_ast, env) do
+      {value, env}
     end
   end
 
-  def interpret([statement_ast | statement_asts], scope) do
-    with {_, scope} <- interpret(statement_ast, scope) do
-      interpret([statement_asts], scope)
+  def interpret([statement_ast | statement_asts], env) do
+    with {_, env} <- interpret(statement_ast, env) do
+      interpret([statement_asts], env)
     end
   end
 

@@ -2,30 +2,38 @@ defmodule NtrprtTest do
   use ExUnit.Case
 
   test "interprets asts" do
-    assert interpret("1+2") == {3, %{}}
-    assert interpret("2-1") == {1, %{}}
-    assert interpret("2+3+10*2") == {25, %{}}
-    assert interpret("2") == {2, %{}}
-    assert interpret("1+3/3") == {2, %{}}
-    assert interpret("2*2*2") == {8, %{}}
-    assert interpret("2*(2+2)") == {8, %{}}
-    assert interpret("((10+20))") == {30, %{}}
-    assert interpret("((10+20)*2)") == {60, %{}}
-    assert interpret("2*-1") == {-2, %{}}
-    assert interpret("2*--1") == {2, %{}}
-    assert interpret("2*---1") == {-2, %{}}
-    assert interpret("2*-(-(+2-1))") == {2, %{}}
-    assert interpret("5 - - - + - (3 + 4) - +2") == {10, %{}}
-    assert interpret("a=1+2") == {3, %{"a" => 3}}
-    assert interpret("a=1+2; b=a+4") == {7, %{"a" => 3, "b" => 7}}
-    assert interpret("a=1+2\n b=a+4") == {7, %{"a" => 3, "b" => 7}}
+    assert {3.0, _} = interpret("1+2")
+    assert {1.0, _} = interpret("2-1")
+    assert {25.0, _} = interpret("2+3+10*2")
+    assert {2.0, _} = interpret("2")
+    assert {2.0, _} = interpret("1+3/3")
+    assert {8.0, _} = interpret("2*2*2")
+    assert {8.0, _} = interpret("2*(2+2)")
+    assert {30.0, _} = interpret("((10+20))")
+    assert {60.0, _} = interpret("((10+20)*2)")
+    assert {-2.0, _} = interpret("2*-1")
+    assert {2.0, _} = interpret("2*--1")
+    assert {-2.0, _} = interpret("2*---1")
+    assert {2.0, _} = interpret("2*-(-(+2-1))")
+    assert {10.0, _} = interpret("5 - - - + - (3 + 4) - +2")
+    assert {3.0, _} = interpret("a=1+2")
+    assert {7.0, _} = interpret("a=1+2; b=a+4")
+    assert {7.0, _} = interpret("a=1+2\n b=a+4")
 
-    assert {5.0, %{}} = interpret("inc = fn ->(x) x + 1; inc(inc(3))")
+    assert {5.0, _} = interpret("inc = fn ->(x) x + 1; inc(inc(3))")
 
-    assert {3.0, %{}} =
+    assert {3.0, _} =
              interpret("""
              addcurry = fn ->(x) fn ->(y) x + y
              addcurry(1)(2)
+             """)
+
+    assert {999.0, _} =
+             interpret("""
+             k = fn ->(x) fn ->(y) x
+             s = fn ->(x) fn ->(y) fn ->(z) x(z)(y(z))
+             id = s(k)(k)
+             id(999)
              """)
   end
 

@@ -35,6 +35,13 @@ defmodule NtrprtTest do
              id = s(k)(k)
              id(999)
              """)
+
+    assert {8.0, _} =
+             interpret("""
+             x = 4
+             doublex = fn ->() x * 2
+             doublex()
+             """)
   end
 
   defp interpret(str) do

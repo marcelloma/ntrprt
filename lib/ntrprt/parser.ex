@@ -29,9 +29,7 @@ defmodule Ntrprt.Parser do
   end
 
   defp statement() do
-    fn tokens ->
-      choice([assignment(), expression()]).(tokens)
-    end
+    choice([assignment(), expression()])
   end
 
   defp assignment() do
@@ -44,31 +42,23 @@ defmodule Ntrprt.Parser do
   end
 
   defp expression() do
-    fn tokens ->
-      # IO.inspect(tokens, label: "here2")
-      choice([
-        function(),
-        function_call(),
-        plus_or_minus(),
-        term()
-      ]).(tokens)
-    end
+    choice([
+      function(),
+      function_call(),
+      plus_or_minus(),
+      term()
+    ])
   end
 
   defp function() do
     sequence([
-      # |> debug("fn"),
       match(:fn),
-      # |> debug("->"),
       match(:->),
-      # |> debug("arg_list"),
       formal_argument_list(),
       choice([
         sequence([match(:"{"), &block().(&1), match(:"}")]) |> map(&Enum.at(&1, 1)),
         wrap(&expression().(&1))
       ])
-
-      # |> debug("body")
     ])
     |> map(fn [_, _, args, body] -> [:fn, [args, body]] end)
   end
@@ -88,31 +78,26 @@ defmodule Ntrprt.Parser do
 
   defp function_call() do
     sequence([
-      # |> debug("id"),
       identifier(),
       one_or_many(argument_list())
     ])
     |> map(fn [left, right] -> [left | right] end)
     |> map(fn [left | right] ->
-      Enum.reduce(right, left, fn [right], left -> [:call, [left, [right]]] end)
+      Enum.reduce(right, left, fn right, left -> [:call, [left, right]] end)
     end)
   end
 
   defp argument_list() do
-    fn tokens ->
-      # IO.inspect(tokens, label: "arg_list")
-
-      choice([
-        sequence([match(:"("), match(:")")]) |> map(fn _ -> [] end),
-        sequence([
-          match(:"("),
-          &expression().(&1),
-          zero_or_many(sequence([match(:","), identifier()])),
-          match(:")")
-        ])
-        |> map(fn [_, left, right, _] -> [left | right] end)
-      ]).(tokens)
-    end
+    choice([
+      sequence([match(:"("), match(:")")]) |> map(fn _ -> [] end),
+      sequence([
+        match(:"("),
+        &expression().(&1),
+        zero_or_many(sequence([match(:","), identifier()])),
+        match(:")")
+      ])
+      |> map(fn [_, left, right, _] -> [left | right] end)
+    ])
   end
 
   defp plus_or_minus() do
@@ -176,7 +161,7 @@ defmodule Ntrprt.Parser do
   defp number(), do: value(:num)
   defp identifier(), do: value(:id)
 
-  defp debug(parser, label) do
-    map(parser, &IO.inspect(&1, label: label))
-  end
+  # defp debug(parser, label) do
+  #   map(parser, &IO.inspect(&1, label: label))
+  # end
 end

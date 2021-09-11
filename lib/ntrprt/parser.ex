@@ -80,9 +80,12 @@ defmodule Ntrprt.Parser do
   defp function_call() do
     sequence([
       identifier(),
-      argument_list()
+      one_or_many(argument_list())
     ])
-    |> map(fn [name, args] -> [:call, [name, args]] end)
+    |> map(fn [left, right] -> [left | right] end)
+    |> map(fn [left | right] ->
+      Enum.reduce(right, left, fn [right], left -> [:call, [left, [right]]] end)
+    end)
   end
 
   defp argument_list() do

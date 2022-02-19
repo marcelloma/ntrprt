@@ -119,6 +119,7 @@ defmodule Ntrprt.Parser do
       unary(),
       sequence([match(:"("), &expression().(&1), match(:")")]) |> map(&Enum.at(&1, 1)),
       number(),
+      string(),
       identifier()
     ])
   end
@@ -158,10 +159,10 @@ defmodule Ntrprt.Parser do
     end)
   end
 
+  defp string(), do: value(:str)
   defp number(), do: value(:num)
   defp identifier(), do: value(:id)
 
-  # defp debug(parser, label) do
-  #   map(parser, &IO.inspect(&1, label: label))
-  # end
+  # defp debug(parser, label),
+  #   do: map(parser, &IO.inspect(&1, label: label))
 end

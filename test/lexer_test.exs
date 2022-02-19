@@ -63,6 +63,26 @@ defmodule LexerTest do
              a-b;
              fn ->(a, b) { a }
              """)
+
+    # assert [
+    #   {:str, "abc", %{column: 0, line: 0}},
+    # ] = lex("\"abc\"")
+
+    assert [
+             {:str, "a\"bc", %{column: 0, line: 0}}
+           ] = lex("\"a\\\"bc\"")
+
+    assert [
+             {:str, "a\"b\"c", %{column: 0, line: 0}}
+           ] = lex("\"a\\\"b\\\"c\"")
+
+    assert [
+             {:str, "a\"b\"c\"d\"e\"f", %{column: 0, line: 0}}
+           ] = lex("\"a\\\"b\\\"c\\\"d\\\"e\\\"f\"")
+
+    assert [
+             {:str, "a\"bc", %{column: 0, line: 0}}
+           ] = lex("\"a\\\"bc\"")
   end
 
   defp lex(str) do

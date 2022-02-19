@@ -1,10 +1,12 @@
 defmodule Ntrprt.Lexer do
-  @symbols [?+, ?-, ?*, ?/, ?=, ?;, ?,, ?!, ?(, ?), ?{, ?}, ?\n, ?;]
+  @symbols [?+, ?-, ?*, ?/, ?=, ?;, ?,, ?!, ?(, ?), ?{, ?}, ?;]
   @complex_symbols [[?-, ?>], [?=, ?=], [?!, ?=], [?<, ?=], [?>, ?=]]
-
+  @new_line ?\n
   @whitespace [?\r, ?\v, ?\t, ?\s]
   @alpha ?A..?z
   @digits ?0..?9
+  @string_delimiter ?"
+
   @keywords ["fn", "if", "else"]
 
   @type meta() :: %{line: integer(), column: integer()}
@@ -40,9 +42,11 @@ defmodule Ntrprt.Lexer do
   end
 
   @spec read_token(charlist()) :: {atom(), any(), integer()}
-  defp read_token([char | _]) when char in @whitespace do
-    {:" ", nil, 1}
-  end
+  defp read_token([char | _]) when char in @whitespace,
+    do: {:" ", nil, 1}
+
+  defp read_token([char | _]) when char == @new_line,
+    do: {:"\n", nil, 1}
 
   defp read_token([char1, char2 | _]) when [char1, char2] in @complex_symbols do
     symbol =
@@ -53,29 +57,40 @@ defmodule Ntrprt.Lexer do
     {symbol, nil, 2}
   end
 
+  defp read_token([char | unprocessed]) when char == @string_delimiter do
+    {value_chars, token_length} =
+      unprocessed
+      |> read_while(&(&1 != @string_delimiter))
+
+    value = List.to_string(value_chars)
+    token_length = token_length + 2
+
+    {:str, value, token_length}
+  end
+
   defp read_token([char | _]) when char in @symbols do
     {String.to_atom(<<char::utf8>>), nil, 1}
   end
 
   defp read_token([char | _] = unprocessed) when char in @digits do
-    value =
+    {value_chars, token_length} =
       unprocessed
       |> read_while(&(&1 in @digits || &1 in @alpha))
-      |> List.to_string()
 
-    token_length = String.length(value)
-    {value, _} = Float.parse(value)
+    {value, _} =
+      value_chars
+      |> List.to_string()
+      |> Float.parse()
 
     {:num, value, token_length}
   end
 
   defp read_token([char | _] = unprocessed) when char in @alpha do
-    value =
+    {value_chars, token_length} =
       unprocessed
       |> read_while(&(&1 in @digits || &1 in @alpha))
-      |> List.to_string()
 
-    token_length = String.length(value)
+    value = List.to_string(value_chars)
 
     if value in @keywords do
       {String.to_atom(value), nil, token_length}
@@ -84,10 +99,25 @@ defmodule Ntrprt.Lexer do
     end
   end
 
-  @spec read_while(charlist(), (char() -> boolean())) :: charlist()
-  defp read_while([], _fun), do: []
+  @spec read_while(charlist(), (char() | [char()] -> boolean())) ::
+          {charlist(), non_neg_integer()}
+  defp read_while([], _fun), do: {[], 0}
+
+  defp read_while([?\\, char | rest], fun) do
+    if fun.([?\\, char]) do
+      {matched, consumed} = read_while(rest, fun)
+      {[char | matched], consumed + 2}
+    else
+      {[], 0}
+    end
+  end
 
   defp read_while([char | rest], fun) do
-    if fun.(char), do: [char | read_while(rest, fun)], else: []
+    if fun.(char) do
+      {matched, consumed} = read_while(rest, fun)
+      {[char | matched], consumed + 1}
+    else
+      {[], 0}
+    end
   end
 end

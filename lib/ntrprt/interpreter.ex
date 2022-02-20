@@ -54,11 +54,14 @@ defmodule Ntrprt.Interpreter do
     end
   end
 
+  def interpret([true], env), do: {true, env}
+  def interpret([false], env), do: {false, env}
+
   def interpret([:integer, value], env), do: {value, env}
   def interpret([:float, value], env), do: {value, env}
   def interpret([:id, identifier], env), do: {Env.get_variable(env, identifier), env}
 
-  def interpret([operator, [value_ast]], env) when operator in [:+, :-] do
+  def interpret([operator, [value_ast]], env) when operator in [:+, :-, :!] do
     with {value, env} <- interpret(value_ast, env) do
       {run_unary(operator, value), env}
     end
@@ -85,6 +88,7 @@ defmodule Ntrprt.Interpreter do
 
   defp run_unary(:+, value), do: +value
   defp run_unary(:-, value), do: -value
+  defp run_unary(:!, value), do: !value
 
   defp run_binary(:+, left, right), do: left + right
   defp run_binary(:-, left, right), do: left - right

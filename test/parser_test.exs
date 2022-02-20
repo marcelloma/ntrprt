@@ -57,6 +57,9 @@ defmodule ParserTest do
              inc = fn ->(x) x + 1
              inc(3)
              """)
+
+    assert [[:=, [[:id, "a"], [true]]], [:id, "a"]] = parse("a = true; a")
+    assert [[:=, [[:id, "a"], [false]]], [:id, "a"]] = parse("a = false; a")
   end
 
   defp parse(str) do

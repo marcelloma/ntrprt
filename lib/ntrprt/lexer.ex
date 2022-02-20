@@ -7,7 +7,7 @@ defmodule Ntrprt.Lexer do
   @digits ?0..?9
   @string_delimiter ?"
 
-  @keywords ["fn", "if", "else"]
+  @keywords ["fn", "if", "else", "true", "false"]
 
   @type meta() :: %{line: integer(), column: integer()}
   @type token() :: {:atom, meta()} | {:atom, any(), meta()}
@@ -97,7 +97,7 @@ defmodule Ntrprt.Lexer do
   defp read_token([char | _] = unprocessed) when char in @alpha do
     {value_chars, token_length} =
       unprocessed
-      |> read_while(&(&1 in @digits || &1 in @alpha))
+      |> read_while(&(&1 in @digits || &1 in @alpha || &1 == ??))
 
     value = List.to_string(value_chars)
 

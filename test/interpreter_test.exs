@@ -53,6 +53,24 @@ defmodule NtrprtTest do
              }
              double_x_add_2()
              """)
+
+    assert {true, _} =
+             interpret("""
+               true? = fn ->() true
+               true?()
+             """)
+
+    assert {false, _} =
+             interpret("""
+               true? = fn ->() !true
+               true?()
+             """)
+
+    assert {true, _} =
+    interpret("""
+      true? = fn ->() !!true
+      true?()
+    """)
   end
 
   defp interpret(str) do

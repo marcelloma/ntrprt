@@ -121,12 +121,13 @@ defmodule Ntrprt.Parser do
       float(),
       integer(),
       string(),
+      boolean(),
       identifier()
     ])
   end
 
   defp unary() do
-    choice([match(:+), match(:-)])
+    choice([match(:+), match(:-), match(:!)])
     |> unary_operation(&factor().(&1))
   end
 
@@ -163,6 +164,7 @@ defmodule Ntrprt.Parser do
   defp string(), do: value(:str)
   defp float(), do: value(:float)
   defp integer(), do: value(:integer)
+  defp boolean(), do: choice([match(true), match(false)]) |> wrap()
   defp identifier(), do: value(:id)
 
   # defp debug(parser, label),

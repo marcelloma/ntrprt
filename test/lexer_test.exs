@@ -87,6 +87,11 @@ defmodule LexerTest do
     assert [
              {:float, 1.2, %{column: 0, line: 0}}
            ] = lex("1.2")
+
+    assert [{true, %{column: 0, line: 0}}] = lex("true")
+    assert [{false, %{column: 0, line: 0}}] = lex("false")
+
+    assert [{:!, %{column: 0, line: 0}}, {false, %{column: 1, line: 0}}] = lex("!false")
   end
 
   defp lex(str) do

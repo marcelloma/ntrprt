@@ -29,7 +29,7 @@ defmodule Ntrprt.Parser do
   end
 
   defp statement() do
-    choice([assignment(), expression()])
+    choice([assignment(), expression(), conditional()])
   end
 
   defp assignment() do
@@ -47,6 +47,26 @@ defmodule Ntrprt.Parser do
       function_call(),
       plus_or_minus(),
       term()
+    ])
+  end
+
+  defp conditional() do
+    sequence([
+      match(:if),
+      sequence([match(:"("), &condition().(&1), match(:")")]) |> map(&Enum.at(&1, 1)),
+      sequence([match(:"{"), &block().(&1), match(:"}")]) |> map(&Enum.at(&1, 1)),
+      zero_or_one(
+        sequence([match(:else), match(:"{"), &block().(&1), match(:"}")])
+        |> map(&if length(&1) > 0, do: Enum.at(&1, 2), else: [])
+      )
+    ])
+    |> map(fn [_, check, true_body, false_body] -> [:if, [check, true_body, false_body]] end)
+  end
+
+  defp condition() do
+    choice([
+      assignment(),
+      expression()
     ])
   end
 

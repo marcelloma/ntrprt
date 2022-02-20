@@ -41,6 +41,18 @@ defmodule Ntrprt.Combinator do
     end
   end
 
+  def zero_or_one(function) do
+    fn tokens ->
+      case function.(tokens) do
+        {:error, _message} ->
+          {:ok, [], tokens}
+
+        {:ok, value, tokens} ->
+          {:ok, value, tokens}
+      end
+    end
+  end
+
   def one_or_many(function) do
     fn tokens ->
       case function.(tokens) do

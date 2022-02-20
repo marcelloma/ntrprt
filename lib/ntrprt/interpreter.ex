@@ -42,6 +42,14 @@ defmodule Ntrprt.Interpreter do
     end
   end
 
+  def interpret([:if, [condition_ast, true_ast, false_ast]], env) do
+    with {value, true_env} <- interpret(condition_ast, env),
+         {value, _} <-
+           if(value, do: interpret(true_ast, true_env), else: interpret(false_ast, env)) do
+      {value, env}
+    end
+  end
+
   def interpret([:call, [[:call | _] = other_call, argument_asts]], env) do
     with {[:fn, [formal_arguments, body_ast, local_env]], env} <- interpret(other_call, env),
          formal_arguments <- Enum.map(formal_arguments, &Enum.at(&1, 1)),
@@ -75,9 +83,7 @@ defmodule Ntrprt.Interpreter do
   end
 
   def interpret([statement_ast], env) do
-    with {value, env} <- interpret(statement_ast, env) do
-      {value, env}
-    end
+    interpret(statement_ast, env)
   end
 
   def interpret([statement_ast | statement_asts], env) do

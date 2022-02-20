@@ -67,10 +67,28 @@ defmodule NtrprtTest do
              """)
 
     assert {true, _} =
-    interpret("""
-      true? = fn ->() !!true
-      true?()
-    """)
+             interpret("""
+               true? = fn ->() !!true
+               true?()
+             """)
+
+    assert {1, _} =
+             interpret("""
+               if (true) {
+                 1
+               } else {
+                 2
+               }
+             """)
+
+    assert {2, _} =
+             interpret("""
+               if (false) {
+                 1
+               } else {
+                 2
+               }
+             """)
   end
 
   defp interpret(str) do

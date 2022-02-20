@@ -60,6 +60,11 @@ defmodule ParserTest do
 
     assert [[:=, [[:id, "a"], [true]]], [:id, "a"]] = parse("a = true; a")
     assert [[:=, [[:id, "a"], [false]]], [:id, "a"]] = parse("a = false; a")
+
+    assert [[:if, [[true], [[:integer, 1]], [[:integer, 2]]]]] =
+             parse("if (true) { 1 } else { 2 }")
+
+    assert [[:if, [[true], [[:integer, 1]], []]]] = parse("if (true) { 1 }")
   end
 
   defp parse(str) do

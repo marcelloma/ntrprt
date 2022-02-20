@@ -118,7 +118,8 @@ defmodule Ntrprt.Parser do
     choice([
       unary(),
       sequence([match(:"("), &expression().(&1), match(:")")]) |> map(&Enum.at(&1, 1)),
-      number(),
+      float(),
+      integer(),
       string(),
       identifier()
     ])
@@ -160,7 +161,8 @@ defmodule Ntrprt.Parser do
   end
 
   defp string(), do: value(:str)
-  defp number(), do: value(:num)
+  defp float(), do: value(:float)
+  defp integer(), do: value(:integer)
   defp identifier(), do: value(:id)
 
   # defp debug(parser, label),

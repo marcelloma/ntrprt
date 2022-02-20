@@ -54,7 +54,8 @@ defmodule Ntrprt.Interpreter do
     end
   end
 
-  def interpret([:num, value], env), do: {value, env}
+  def interpret([:integer, value], env), do: {value, env}
+  def interpret([:float, value], env), do: {value, env}
   def interpret([:id, identifier], env), do: {Env.get_variable(env, identifier), env}
 
   def interpret([operator, [value_ast]], env) when operator in [:+, :-] do

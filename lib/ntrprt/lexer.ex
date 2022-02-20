@@ -75,14 +75,23 @@ defmodule Ntrprt.Lexer do
   defp read_token([char | _] = unprocessed) when char in @digits do
     {value_chars, token_length} =
       unprocessed
-      |> read_while(&(&1 in @digits || &1 in @alpha))
+      |> read_while(&(&1 in @digits || &1 == ?.))
 
-    {value, _} =
-      value_chars
-      |> List.to_string()
-      |> Float.parse()
+    if ?. in value_chars do
+      {value, ""} =
+        value_chars
+        |> List.to_string()
+        |> Float.parse()
 
-    {:num, value, token_length}
+      {:float, value, token_length}
+    else
+      {value, ""} =
+        value_chars
+        |> List.to_string()
+        |> Integer.parse()
+
+      {:integer, value, token_length}
+    end
   end
 
   defp read_token([char | _] = unprocessed) when char in @alpha do

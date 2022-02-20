@@ -7,21 +7,21 @@ defmodule LexerTest do
     assert [
              {:id, "abc", %{}},
              {:=, %{}},
-             {:num, 1.0, %{}},
+             {:integer, 1, %{}},
              {:+, %{}},
-             {:num, 2.0, %{}}
+             {:integer, 2, %{}}
            ] = lex("abc=1+2")
 
     assert [
              {:id, "a", %{}},
              {:=, %{}},
-             {:num, 1.0, %{}},
+             {:integer, 1, %{}},
              {:";", %{}},
              {:id, "b", %{}},
              {:=, %{}},
              {:id, "a", %{}},
              {:+, %{}},
-             {:num, 2.0, %{}}
+             {:integer, 2, %{}}
            ] = lex("a=1; b=a+2")
 
     assert [
@@ -64,9 +64,9 @@ defmodule LexerTest do
              fn ->(a, b) { a }
              """)
 
-    # assert [
-    #   {:str, "abc", %{column: 0, line: 0}},
-    # ] = lex("\"abc\"")
+    assert [
+             {:str, "abc", %{column: 0, line: 0}}
+           ] = lex("\"abc\"")
 
     assert [
              {:str, "a\"bc", %{column: 0, line: 0}}
@@ -83,6 +83,10 @@ defmodule LexerTest do
     assert [
              {:str, "a\"bc", %{column: 0, line: 0}}
            ] = lex("\"a\\\"bc\"")
+
+    assert [
+             {:float, 1.2, %{column: 0, line: 0}}
+           ] = lex("1.2")
   end
 
   defp lex(str) do

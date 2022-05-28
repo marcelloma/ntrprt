@@ -38,7 +38,7 @@ defmodule Ntrprt.Parser do
       match(:=),
       expression()
     ])
-    |> map(fn [left, operator, right] -> [operator, [left, right]] end)
+    |> map(fn [left, [operator, meta], right] -> [operator, [left, right], meta] end)
   end
 
   defp expression() do
@@ -153,21 +153,21 @@ defmodule Ntrprt.Parser do
 
   defp match(token) do
     fn
-      [{^token, %{}} | rest] -> {:ok, token, rest}
+      [{^token, meta} | rest] -> {:ok, [token, meta], rest}
       _ -> {:error, ""}
     end
   end
 
   defp value(token) do
     fn
-      [{^token, value, %{}} | rest] -> {:ok, [token, value], rest}
+      [{^token, value, meta} | rest] -> {:ok, [token, value, meta], rest}
       _ -> {:error, ""}
     end
   end
 
   defp unary_operation(operator, term) do
     sequence([operator, term])
-    |> map(fn [left, right] -> [left, [right]] end)
+    |> map(fn [[left, meta], right] -> [left, [right], meta] end)
   end
 
   defp binary_operation(operator, term) do
@@ -177,7 +177,7 @@ defmodule Ntrprt.Parser do
     ])
     |> map(fn [left, right] -> [left | right] end)
     |> map(fn [left | right] ->
-      Enum.reduce(right, left, fn [op, right_argument], left -> [op, [left, right_argument]] end)
+      Enum.reduce(right, left, fn [[op, meta], right_argument], left -> [op, [left, right_argument], meta] end)
     end)
   end
 
